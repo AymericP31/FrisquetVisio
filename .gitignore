@@ -1,0 +1,5 @@
+.pio/
+.vscode/
+**/config_local.h
+*.exe
+/radio_test
