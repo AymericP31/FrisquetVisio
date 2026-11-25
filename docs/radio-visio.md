@@ -81,7 +81,7 @@ Source `80`, type `81` :
 | 17 | Code de mode chaudière |
 | 19–20 / 21–22 / 24 | Z1 : température ambiante / consigne / mode |
 | 29–30 / 31–32 / 34 | Z2 : température ambiante / consigne / mode |
-| 39–40 / 41–42 / 44 | Z3 : offsets supposés ; non validés sur matériel |
+| 39–40 / 41–42 / 44 | Z3 : température ambiante / consigne / mode ; non validés sur matériel |
 
 ### Chaudière et modules hydrauliques
 
