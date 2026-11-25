@@ -150,6 +150,32 @@ float FrisquetVisio::temperature(const uint8_t* bytes) {
     return static_cast<int16_t>(value) / 10.0f;
 }
 
+// Trame CRC invalide : octets exploités dans une plage cohérente ?
+bool FrisquetVisio::plausible(const uint8_t* frame, size_t length) const {
+    auto in = [frame](size_t i, float lo, float hi) {
+        const float t = temperature(frame + i);
+        return t >= lo && t <= hi;
+    };
+    switch (length) {
+    case 23:  // Thermostat : ambiance, consigne, mode
+        return in(15, 0, 40) && in(17, 5, 30)
+            && (frame[20] <= 0x05 || frame[20] == 0x10 || frame[20] == 0x14);
+    case 49:  // Chaudière : T° ext (saturée à 35 °C), mode, ambiance + consigne des zones gérées
+        for (size_t z = 0; z < config_.zoneCount; ++z) {
+            if (!in(19 + z * 10, 0, 40) || !in(21 + z * 10, 5, 30)) return false;
+        }
+        return in(7, -20, 35) && frame[17] <= 9;
+    case 19:  // Chaudière -> module : T° eau consigne, mode (9 = chaudière arrêtée)
+        return in(15, 0, 70) && (frame[18] <= 3 || frame[18] == 9 || frame[18] == 42);
+    case 9:   // Module -> chaudière : T° eau départ
+        return in(7, 0, 70);
+    case 15:  // Chaudière -> module : mode chaudière
+        return frame[13] <= 9;
+    default:  // Aucun octet exploité
+        return true;
+    }
+}
+
 // Zone concernée par une trame thermostat (23 o) ou par la réponse chaudière (49 o), sinon -1.
 int8_t FrisquetVisio::frameZone(const uint8_t* frame, size_t length) const {
     if (length < 6) return -1;
@@ -162,7 +188,7 @@ int8_t FrisquetVisio::frameZone(const uint8_t* frame, size_t length) const {
     return static_cast<int8_t>(address - FirstSatelliteAddress);
 }
 
-void FrisquetVisio::decode(const uint8_t* frame, size_t length, uint32_t now) {
+void FrisquetVisio::decode(const uint8_t* frame, size_t length, uint32_t now, bool crcMismatch) {
     // Octet 5 = 0x17 pour toutes les trames Visio exploitées.
     if (length < 6 || frame[5] != 0x17) return;
     const int8_t index = frameZone(frame, length);
@@ -183,6 +209,7 @@ void FrisquetVisio::decode(const uint8_t* frame, size_t length, uint32_t now) {
             && transaction.lastBase == base && now - transaction.lastSentAt < DuplicateWindowMs;
         // En Auto rien n'est émis ; sinon on mémorise la trame comme modèle d'émission.
         transaction.pending = zone.mode != Mode::Auto && !duplicate;
+        transaction.satelliteCrcMismatch = crcMismatch;
         if (transaction.pending) {
             std::memcpy(transaction.frame, frame, sizeof(transaction.frame));
             transaction.receivedAt = now;
@@ -209,6 +236,16 @@ void FrisquetVisio::decode(const uint8_t* frame, size_t length, uint32_t now) {
         if (transaction.pending && frame[0] == transaction.frame[1]
             && frame[1] == transaction.frame[0] && frame[2] == transaction.frame[2]
             && frame[3] == transaction.frame[3]) {
+            if (transaction.satelliteCrcMismatch) {
+                // Bloc de la zone dans la reponse chaudiere : 19-26 (Z1), 29-36 (Z2), 39-46 (Z3).
+                const uint8_t* TramBoilerZone = frame + 19 + index * 10;
+                // Comparer aux octets 15-22 du thermostat ; toute difference annule le TX.
+                if (std::memcmp(transaction.frame + 15, TramBoilerZone, 8) != 0) {
+                    transaction.pending = false;
+                    return;
+                }
+                std::memcpy(transaction.frame + 15, TramBoilerZone, 8);
+            }
             transaction.responseReceived = true;
         }
         // Réponse à notre trame simulée : confirmation.
@@ -329,8 +366,9 @@ int16_t FrisquetVisio::loop() {
         radio_.clearPacketReceivedAction();
         const int16_t receiveStatus = startReceive();
         const bool usable = status == RADIOLIB_ERR_NONE
-            || (status == RADIOLIB_ERR_CRC_MISMATCH && config_.acceptCrcMismatch && length > 0);
-        if (usable) decode(rxBuffer_, length, millis());
+            || (status == RADIOLIB_ERR_CRC_MISMATCH && config_.acceptCrcMismatch
+                && length > 0 && plausible(rxBuffer_, length));
+        if (usable) decode(rxBuffer_, length, millis(), status == RADIOLIB_ERR_CRC_MISMATCH);
         notify(EventType::Receive, rxBuffer_, length, status, rssi, frameZone(rxBuffer_, length));
         if (receiveStatus != RADIOLIB_ERR_NONE) return receiveStatus;
         if (status != RADIOLIB_ERR_NONE) return status;

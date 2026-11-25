@@ -42,8 +42,8 @@ void setup() {
     SPI.begin(9, 11, 10, 8);  // SCK, MISO, MOSI, NSS
     FrisquetVisio::Config config;
     std::memcpy(config.networkId, NETWORK_ID, sizeof(config.networkId));
-    // Trames en erreur CRC : true = traitées normalement comme une trame correcte (défaut,
-    // aucun problème constaté) ; false = ignorées. Visible dans TramType « (CRC non valide) ».
+    // Trames en erreur CRC : true = traitées si températures/modes plausibles (défaut) ;
+    // false = ignorées. Visible dans TramType « (CRC non valide) ».
     config.acceptCrcMismatch = true;
     // TramType : chaque trame reçue/émise est publiée dans HA pour vérifier la radio.
     visio.onEvent(FrisquetVisioHA::onRadioEvent, &visioHA);

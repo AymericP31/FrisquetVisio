@@ -117,7 +117,7 @@ struct Config;
 | `outputPowerDbm` | `int8_t` | 10 | Puissance d'émission |
 | `boostedGain` | `bool` | `true` | Gain RX renforcé du SX1262 |
 | `txDelayMs` | `uint16_t[3]` | `{150,150,150}` | Délai minimal (0–1000 ms) entre la trame thermostat et l'émission simulée. L'émission attend **en plus** la réponse chaudière. |
-| `acceptCrcMismatch` | `bool` | `true` | `true` : trame en erreur CRC traitée comme une trame correcte. `false` : seulement signalée. |
+| `acceptCrcMismatch` | `bool` | `true` | `true` : trame en erreur CRC traitée si ses octets exploités sont plausibles (voir [radio-visio.md](radio-visio.md#crc)). `false` : seulement signalée. |
 
 #### Zone
 

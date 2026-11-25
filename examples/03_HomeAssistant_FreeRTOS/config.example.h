@@ -17,7 +17,7 @@ static const uint8_t NETWORK_ID[4] = {0x00, 0x00, 0x00, 0x00};
 // Délai entre la trame du thermostat et la trame simulée, par zone (0 à 1000 ms).
 static const uint16_t TX_DELAY_MS[3] = {150, 150, 150};
 // Trames en erreur CRC (le SX1262 fournit les octets reçus même si le CRC est faux) :
-//   true  = traitées normalement (défaut de la bibliothèque, aucun problème constaté) ;
+//   true  = traitées si températures/modes dans une plage cohérente (défaut) ;
 //   false = ignorées, seulement affichées dans TramType « (CRC non valide) ».
 #define ACCEPT_CRC_MISMATCH true
 // TramType : true = ajoute les octets de la trame en hexadécimal (debug, ex-ConfTram).

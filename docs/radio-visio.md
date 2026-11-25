@@ -15,9 +15,24 @@ L'émission `TrNum +4` a été validée sur les deux zones avec le firmware d'or
 | Bande RX | 187,2 kHz ; réglable selon la réception |
 | Préambule | Valeur `4` passée à RadioLib (son API l'exprime en bits) |
 | Sync word | Network ID propre à l'installation, quatre octets |
-| CRC | Contrôlé par le SX1262 avec les paramètres RadioLib utilisés. Trame en erreur CRC : octets quand même lus ; traitée normalement par défaut, ignorée si `acceptCrcMismatch = false` |
+| CRC | Contrôlé par le SX1262 avec les paramètres RadioLib utilisés. Trame en erreur CRC : octets quand même lus ; traitée par défaut si plausible (voir ci-dessous), ignorée si `acceptCrcMismatch = false` |
 
 Le SX1262 est **half-duplex** : il ne reçoit pas pendant qu'il émet. Le CRC vérifie une trame détectée, mais ne compte pas les trames jamais reçues.
+
+### CRC
+
+Un CRC faux indique qu'au moins un bit est erroné, sans dire lequel. L'en-tête (longueur, adresses, type, `0x17`) est contrôlé au décodage ; pour une trame CRC, les octets exploités doivent en plus être dans ces plages :
+
+| Trame | Octets | Plage |
+|---|---|---|
+| Thermostat (23) | 15-16 ambiance / 17-18 consigne / 20 mode | 0-40 °C / 5-30 °C / `00`-`05`, `10`, `14` |
+| Chaudière (49) | 7-8 T° extérieure / 17 mode | -20 à 35 °C (saturée à 35) / 0-9 |
+| Chaudière (49), par zone gérée | `19+10z` ambiance / `21+10z` consigne | 0-40 °C / 5-30 °C |
+| Chaudière → module (19) | 15-16 T° eau / 18 mode | 0-70 °C / 0-3, 9 (chaudière arrêtée), 42 |
+| Module → chaudière (9) | 7-8 T° eau | 0-70 °C |
+| Chaudière → module (15) | 13 mode | 0-9 |
+
+Seules les zones gérées (`zoneCount`) sont contrôlées : une zone absente contient des valeurs quelconques (ex. `04 F6`). Une petite corruption restée dans la plage n'est pas détectable. Pour une trame thermostat CRC, la bibliothèque attend aussi la réponse chaudière et compare exactement ses octets 15–22 avec l'écho chaudière (`19 + 10 × zone` à `26 + 10 × zone`). Si les blocs diffèrent, l'injection est annulée ; s'ils correspondent, l'émission simulée peut continuer.
 
 ## Équipements et en-tête
 
@@ -149,6 +164,6 @@ L'IRQ RX est détachée pendant le TX et rétablie ensuite. Une notification n'e
 
 ## Diagnostic
 
-L'événement `Receive` contient les octets reçus, RSSI et statut RadioLib ; un CRC invalide est traité comme une trame correcte par défaut (`acceptCrcMismatch = true`), sinon jamais utilisé pour déclencher un TX. `Transmit` indique le statut de la radio, pas l'application de la consigne. `TransactionExpired` et `ResponseTimeout` signalent une attente dépassée. Les éventuels défauts de réarmement RX sont renvoyés par `loop()` et arrêtent la réception jusqu'à réinitialisation.
+L'événement `Receive` contient les octets reçus, RSSI et statut RadioLib ; un CRC invalide est traité si la trame est plausible (`acceptCrcMismatch = true`), sinon jamais utilisé pour déclencher un TX. `Transmit` indique le statut de la radio, pas l'application de la consigne. `TransactionExpired` et `ResponseTimeout` signalent une attente dépassée. Les éventuels défauts de réarmement RX sont renvoyés par `loop()` et arrêtent la réception jusqu'à réinitialisation.
 
 Garder un journal horodaté des trames et surveiller thermostat, chaudière, pompe et vanne lors des premiers essais. En cas de doute, remettre la zone en Auto ou arrêter la carte ; le thermostat physique reste en place.

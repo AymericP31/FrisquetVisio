@@ -55,7 +55,7 @@ void setup() {
         std::memcpy(config.networkId, NETWORK_ID, sizeof(config.networkId));
     }
     // Trames en erreur CRC : toutes sont affichées ci-dessous (status=-7).
-    // true = traitées normalement (défaut, aucun problème constaté), false = ignorées.
+    // true = traitées si valeurs plausibles (défaut), false = ignorées.
     config.acceptCrcMismatch = true;
     visio.onEvent(onRadioEvent);
     const int16_t status = visio.begin(config);

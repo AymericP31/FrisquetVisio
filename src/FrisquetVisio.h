@@ -62,10 +62,10 @@ public:
         // L'émission attend en plus, toujours, la réponse de la chaudière au thermostat.
         uint16_t txDelayMs[MaxZones] = {150, 150, 150};
         // Trames reçues avec erreur CRC :
-        //  true  (défaut) : traitées normalement, comme une trame correcte (décodage + émission).
-        //                   Aucun problème constaté sur l'installation d'origine ;
-        //  false : ignorées (seulement signalées par onEvent / le code retour de loop()).
-        // RadioLib lit tout de même les octets ; le risque est d'utiliser un octet corrompu.
+        //  true  (défaut) : traitées normalement si les octets exploités sont dans une
+        //                   plage cohérente (températures, modes), sinon ignorées ;
+        //  false : toujours ignorées (seulement signalées par onEvent / le code retour de loop()).
+        // L'en-tête (adresses, type) est de toute façon contrôlé au décodage.
         bool acceptCrcMismatch = true;
     };
 
@@ -149,6 +149,7 @@ private:
     struct Transaction {
         bool pending = false;            // une émission est à faire
         bool responseReceived = false;   // la chaudière a répondu au thermostat
+        bool satelliteCrcMismatch = false;
         uint8_t frame[23] = {};          // dernière trame thermostat, modèle de l'émission
         uint32_t receivedAt = 0;
         // Anti-doublon : les répétitions (+1/+2/+3) d'un échange déjà injecté sont ignorées.
@@ -161,8 +162,9 @@ private:
     static void IRAM_ATTR onRadioPacket();
     static FrisquetVisio* active_;  // instance appelée par l'interruption
     static float temperature(const uint8_t* bytes);
+    bool plausible(const uint8_t* frame, size_t length) const;
     int8_t frameZone(const uint8_t* frame, size_t length) const;
-    void decode(const uint8_t* frame, size_t length, uint32_t now);
+    void decode(const uint8_t* frame, size_t length, uint32_t now, bool crcMismatch);
     void notify(EventType type, const uint8_t* data, size_t length,
                 int16_t status, float rssi, int8_t zone);
     int16_t startReceive();

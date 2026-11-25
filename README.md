@@ -12,7 +12,7 @@ Le thermostat physique reste nécessaire. La carte écoute son échange avec la 
 - Température ambiante, consigne et mode radio des thermostats ; informations chaudière et module hydraulique lorsque leurs trames sont reçues.
 - Modes par zone : **Auto** suit le thermostat physique ; **Heat** impose une consigne ; **Off** demande le hors-gel.
 - Attente de la réponse chaudière correspondant au thermostat, puis émission `TrNum +4`, avec délai réglable de 0 à 1000 ms par zone.
-- Trames en erreur CRC traitées normalement par défaut (`Config::acceptCrcMismatch = true`), ignorées si `false`.
+- Trames en erreur CRC traitées par défaut si leurs valeurs sont plausibles (`Config::acceptCrcMismatch = true`), ignorées si `false`.
 - Partie radio `FrisquetVisio` sans Wi-Fi, MQTT ni FreeRTOS.
 - Partie Home Assistant optionnelle `FrisquetVisioHA` (MQTT Discovery via ArduinoHA), compilée seulement si ArduinoHA est installée. Le Wi-Fi reste dans le sketch.
 
@@ -173,7 +173,7 @@ La notification réveille une tâche ; elle **ne stocke pas les trames**. Le dra
 - L'absence de réponse captée ne prouve pas l'absence de réponse émise. Si la réponse au thermostat n'est pas reçue, aucune injection n'est faite pour cet échange.
 - Les valeurs reçues sont les dernières connues, sans expiration. Après redémarrage, Home Assistant peut afficher un état MQTT retenu jusqu'à la prochaine trame.
 - Les exemples Home Assistant redémarrent en Auto ; des commandes MQTT retenues peuvent ensuite changer ce mode. Les consignes Heat et Off sont relues depuis la NVS.
-- Avec `acceptCrcMismatch = true`, un octet corrompu peut être recopié dans la trame émise.
+- Avec `acceptCrcMismatch = true`, un octet corrompu mais resté dans sa plage plausible (ex. 19,0 → 19,1 °C) peut être recopié dans la trame émise.
 - Dans l'exemple 03, en cas d'arrêt de la radio ou de perte MQTT, les entités sont marquées indisponibles. Après une erreur radio, diagnostiquer puis redémarrer la carte.
 - Protocole non officiel, sans affiliation avec Frisquet ; compatibilité non garantie.
 

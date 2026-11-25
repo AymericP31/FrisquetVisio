@@ -88,7 +88,7 @@ void radioTask(void*) {
     for (uint8_t zone = 0; zone < FrisquetVisio::MaxZones; ++zone) {
         config.txDelayMs[zone] = TX_DELAY_MS[zone];
     }
-    // Trames CRC : true = traitées normalement, false = ignorées (voir config.example.h).
+    // Trames CRC : true = traitées si plausibles, false = ignorées (voir config.example.h).
     config.acceptCrcMismatch = ACCEPT_CRC_MISMATCH;
     visio.onEvent(onRadioEvent);
     // Le hook doit être enregistré AVANT begin(). Contexte = handle de cette tâche.
