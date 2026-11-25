@@ -48,7 +48,9 @@ public:
         Receive,             // trame reçue (status = code RadioLib, CRC compris)
         Transmit,            // trame simulée émise (status = résultat de l'émission)
         TransactionExpired,  // thermostat reçu mais pas de réponse chaudière en 10 s
-        ResponseTimeout      // trame simulée émise mais pas de réponse chaudière en 2 s
+        ResponseTimeout,     // trame simulée émise mais pas de réponse chaudière en 2 s
+        TxConfirmed          // réponse chaudière à la trame simulée (data = réponse,
+                             // notifié juste AVANT l'événement Receive de la même trame)
     };
 
     struct Config {
@@ -164,7 +166,7 @@ private:
     static float temperature(const uint8_t* bytes);
     bool plausible(const uint8_t* frame, size_t length) const;
     int8_t frameZone(const uint8_t* frame, size_t length) const;
-    void decode(const uint8_t* frame, size_t length, uint32_t now, bool crcMismatch);
+    void decode(const uint8_t* frame, size_t length, uint32_t now, bool crcMismatch, float rssi);
     void notify(EventType type, const uint8_t* data, size_t length,
                 int16_t status, float rssi, int8_t zone);
     int16_t startReceive();

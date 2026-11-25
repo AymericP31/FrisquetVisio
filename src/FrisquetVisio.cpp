@@ -188,7 +188,8 @@ int8_t FrisquetVisio::frameZone(const uint8_t* frame, size_t length) const {
     return static_cast<int8_t>(address - FirstSatelliteAddress);
 }
 
-void FrisquetVisio::decode(const uint8_t* frame, size_t length, uint32_t now, bool crcMismatch) {
+void FrisquetVisio::decode(const uint8_t* frame, size_t length, uint32_t now, bool crcMismatch,
+                           float rssi) {
     // Octet 5 = 0x17 pour toutes les trames Visio exploitées.
     if (length < 6 || frame[5] != 0x17) return;
     const int8_t index = frameZone(frame, length);
@@ -254,6 +255,8 @@ void FrisquetVisio::decode(const uint8_t* frame, size_t length, uint32_t now, bo
             && now - sentAt_ < SimulatedResponseTimeoutMs) {
             zones_[index].lastTxConfirmed = true;
             waitingForResponse_ = false;
+            notify(EventType::TxConfirmed, frame, length,
+                   crcMismatch ? RADIOLIB_ERR_CRC_MISMATCH : RADIOLIB_ERR_NONE, rssi, index);
         }
         return;
     }
@@ -368,7 +371,7 @@ int16_t FrisquetVisio::loop() {
         const bool usable = status == RADIOLIB_ERR_NONE
             || (status == RADIOLIB_ERR_CRC_MISMATCH && config_.acceptCrcMismatch
                 && length > 0 && plausible(rxBuffer_, length));
-        if (usable) decode(rxBuffer_, length, millis(), status == RADIOLIB_ERR_CRC_MISMATCH);
+        if (usable) decode(rxBuffer_, length, millis(), status == RADIOLIB_ERR_CRC_MISMATCH, rssi);
         notify(EventType::Receive, rxBuffer_, length, status, rssi, frameZone(rxBuffer_, length));
         if (receiveStatus != RADIOLIB_ERR_NONE) return receiveStatus;
         if (status != RADIOLIB_ERR_NONE) return status;

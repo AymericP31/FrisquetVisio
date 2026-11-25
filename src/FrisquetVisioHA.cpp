@@ -43,6 +43,7 @@ const char* hydraulicModeText(uint8_t mode, char* buffer) {
     case 1: return "Heat down";
     case 2: return "Flow";
     case 3: return "Heat up";
+    case 9: return "Boiler off";
     case 42: return "Security";
     default: std::snprintf(buffer, 24, "%u", mode); return buffer;
     }
@@ -52,8 +53,8 @@ const char* zoneModeText(uint8_t mode, char* buffer) {
     switch (mode) {
     case 0x00: return "Auto Heure creuse";
     case 0x01: return "Auto Heure pleine";
-    case 0x02: return "Derogation nuit";
-    case 0x03: return "Derogation jour";
+    case 0x02: return "Dérogation nuit";
+    case 0x03: return "Dérogation jour";
     case 0x04: return "Heure creuse";
     case 0x05: return "Heure pleine";
     case 0x10: return "Hors gel";
@@ -205,6 +206,8 @@ void FrisquetVisioHA::loop() {
 void FrisquetVisioHA::onRadioEvent(const FrisquetVisio::Event& event, void* self) {
     FrisquetVisioHA* const ha = static_cast<FrisquetVisioHA*>(self);
     if (ha == nullptr || ha->radioRecords_ == nullptr) return;
+    // Confirmation : l'événement Receive qui suit affiche déjà « 81: Réponse Chaudière ».
+    if (event.type == FrisquetVisio::EventType::TxConfirmed) return;
     RadioRecord record;
     record.at = millis();
     record.status = event.status;

@@ -53,6 +53,7 @@ Depuis la racine du dépôt, avec PlatformIO :
 | [01_Sniffer](examples/01_Sniffer/) | Écoute passive, trames brutes, récupération du Network ID ; boucle Arduino classique. | `sniffer_v3`, `sniffer_v4` |
 | [02_HomeAssistant](examples/02_HomeAssistant/) | Le plus simple avec HA : `FrisquetVisioHA`, 1 zone, 1 module, valeurs par défaut ; tout dans la boucle Arduino. Pour comprendre le principe. | `home_assistant_v3`, `home_assistant_v4` |
 | [03_HomeAssistant_FreeRTOS](examples/03_HomeAssistant_FreeRTOS/) | Organisation du firmware d'origine : tâche radio (prio 4, réveillée par l'ISR) + tâche HA/MQTT (prio 3), boucle Arduino supprimée ; zones, modules, délais, CRC et TramType configurables. Chronologie TX commentée. | `home_assistant_freertos_v3`, `home_assistant_freertos_v4` |
+| [04_Telnet_OLED](examples/04_Telnet_OLED/) | Diagnostic du firmware d'origine avec `FrisquetVisioStats` : trace Telnet de chaque trame RX/TX, commandes `radio`, `radio-zone1..3`, `radio-chaudiere`, `radio-hydrau`, `radio-heltec`, `radio-init`, `radio-reset` ; page radio OLED (bouton PRG). Écoute seule. | `telnet_oled_v3` |
 
 Pour chaque exemple, copier son `config.example.h` en `config_local.h`. Les exemples 01 et 02 ne changent que le Network ID : délai **150 ms**, démarrage **Auto**, Heat **20 °C** et Off **5 °C** restent ceux de la bibliothèque. Chaque exemple affiche la ligne `config.acceptCrcMismatch` (défaut `true` : trames CRC traitées normalement) : à vous de choisir.
 
@@ -79,6 +80,10 @@ mqtt.setBufferSize(1024);
 `visioHA.loop()` prend le mutex quelques microsecondes pour appliquer les commandes HA et copier l'état radio, puis publie **sans** le mutex : une reconnexion MQTT ne bloque jamais la tâche radio. `onRadioEvent` ne fait qu'une copie dans une file FreeRTOS (8 événements, non bloquant).
 
 Ajouter `dawidchyrzynski/home-assistant-integration@^2.1.0` aux `lib_deps` du projet. Sans ArduinoHA, `FrisquetVisioHA.cpp` compile vide.
+
+## Diagnostic : `FrisquetVisioStats`
+
+Compteurs RX par appareil (thermostats, chaudière, module hydraulique, non attribuées), émissions simulées par zone (TX, erreurs, confirmations chaudière, sans réponse, expirées), erreurs CRC. Appeler `stats.record(event, millis())` dans le callback `onEvent`. `formatTrace()` produit une ligne de trace, `report(device, ...)` le texte des commandes Telnet `radio-*`, `oled()` six lignes pour un écran 128×64. Objet POD : une autre tâche le copie sous le mutex de `visio` puis formate hors mutex. Les confirmations utilisent l'événement `EventType::TxConfirmed` (réponse chaudière à la trame simulée, notifié juste avant le `Receive` de la même trame). Voir l'exemple 04.
 
 ## Utiliser la bibliothèque
 

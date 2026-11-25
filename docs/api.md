@@ -92,7 +92,7 @@ enum class Mode : uint8_t { Auto, Heat, Off };
 #### EventType
 
 ```cpp
-enum class EventType : uint8_t { Receive, Transmit, TransactionExpired, ResponseTimeout };
+enum class EventType : uint8_t { Receive, Transmit, TransactionExpired, ResponseTimeout, TxConfirmed };
 ```
 
 | Valeur | Émis quand | `Event::status` |
@@ -101,6 +101,9 @@ enum class EventType : uint8_t { Receive, Transmit, TransactionExpired, Response
 | `Transmit` | Une trame simulée vient d'être émise | Résultat de l'émission ; ne prouve pas que la consigne est appliquée |
 | `TransactionExpired` | Trame thermostat reçue mais pas de réponse chaudière en 10 s : rien n'est émis | `RADIOLIB_ERR_NONE` |
 | `ResponseTimeout` | Trame simulée émise mais pas de réponse chaudière en 2 s | `RADIOLIB_ERR_NONE` |
+| `TxConfirmed` | Réponse chaudière à la trame simulée ; `data` = cette réponse, notifié juste avant le `Receive` de la même trame | Code RadioLib de lecture |
+
+`FrisquetVisioStats` (`#include <FrisquetVisioStats.h>`) compte ces événements et formate les textes Telnet/OLED : voir le [README](../README.md#diagnostic--frisquetvisiostats) et l'exemple 04.
 
 #### Config
 
