@@ -143,6 +143,7 @@ struct Zone;
 | `frostSetpoint` | `float` | Consigne émise en `Off` |
 | `txCount` | `uint32_t` | Trames simulées émises avec succès |
 | `lastTxConfirmed` | `bool` | La chaudière a répondu à la dernière émission |
+| `batteryLow` | `bool` | Message « CHANGER PILES » du thermostat (trame `43`) ; `false` au démarrage |
 
 Les températures valent `NAN` tant qu'aucune trame n'a été reçue.
 
@@ -152,8 +153,8 @@ Les températures valent `NAN` tant qu'aucune trame n'a été reçue.
 |---|---|---|
 | `dataValid` | `bool` | Trame chaudière → thermostat reçue |
 | `modeValid` | `bool` | Mode chaudière reçu |
-| `outdoorTemperature` | `float` | Température extérieure |
-| `mode` | `uint8_t` | 0 arrêt, 8 chauffage, 9 anomalie… |
+| `outdoorTemperature` | `float` | Température extérieure ; `NAN` si la chaudière n'a pas de sonde (129,0 °C radio) |
+| `mode` | `uint8_t` | Octet brut, champ de bits : `0x08` chauffage, `0x04` contact sec, `0x10`/`0x20` Connect, `9` anomalie ([détail](radio-visio.md#état-chaudière-octet-17-de-la-trame-49-octet-13-de-la-trame-15)) |
 
 #### Hydraulic
 
@@ -407,9 +408,10 @@ Mêmes identifiants que le firmware d'origine.
 | Identifiant | Type HA | Nombre | Contenu |
 |---|---|---|---|
 | `Zone_N` | climate | par zone | Modes Auto/Heat/Off, consigne (curseur 16–24 °C), température = ambiante renvoyée par la chaudière |
-| `ModeZoneN` | sensor texte | par zone | Mode radio du thermostat (Heure pleine, Hors gel…) |
-| `Text` | sensor °C | 1 | Température extérieure |
-| `ModeChaudiere` | sensor texte | 1 | Mode chaudière |
+| `ModeZoneN` | sensor texte | par zone | Mode radio du thermostat (Auto jour, Hors gel…) |
+| `PileZoneN` | binary_sensor `battery` | par zone | `on` = piles faibles du thermostat |
+| `Text` | sensor °C | 1 | Température extérieure (non publiée sans sonde) |
+| `ModeChaudiere` | sensor texte | 1 | Mode chaudière (`Heating On`, `Contact sec`… `+ Connect`) |
 | `TramType` | sensor texte | 1 | Dernière trame reçue/émise, RSSI, CRC, absence de réponse |
 | `TspEauN` | sensor °C | par module | Consigne de départ d'eau |
 | `TmesEauN` | sensor °C | par module | Départ d'eau mesuré |
@@ -443,7 +445,7 @@ Consignes `Heat` et `Off` sauvegardées en NVS (`Preferences` « frisquet », cl
 static constexpr uint8_t entityCount(uint8_t zones, uint8_t hydraulicModules);
 ```
 
-Nombre d'entités créées (`3 + 2 × zones + 3 × modules`), à passer à `HAMqtt`.
+Nombre d'entités créées (`3 + 3 × zones + 3 × modules`), à passer à `HAMqtt`.
 
 ```cpp
 HAMqtt mqtt(wifiClient, device, FrisquetVisioHA::entityCount(2, 1));

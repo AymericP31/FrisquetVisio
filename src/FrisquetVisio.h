@@ -89,14 +89,19 @@ public:
         float frostSetpoint = 5.0f;       // consigne envoyée en Off (hors-gel)
         uint32_t txCount = 0;             // trames simulées émises avec succès
         bool lastTxConfirmed = false;     // la chaudière a répondu à la dernière émission
+        // Message « CHANGER PILES » affiché par le thermostat (trame 0x43 non vide),
+        // effacé par une trame 0x43 vide (piles changées). false au démarrage.
+        bool batteryLow = false;
     };
 
     // État de la chaudière (unique).
     struct Boiler {
         bool dataValid = false;           // trame chaudière -> thermostat reçue
         bool modeValid = false;
-        float outdoorTemperature = NAN;
-        uint8_t mode = 0;                 // 0 arrêt, 8 chauffage, 9 anomalie...
+        float outdoorTemperature = NAN;   // NAN si pas de sonde (valeur radio 129,0 °C)
+        // Octet brut, champ de bits : 0x08 chauffage, 0x04 arrêt chauffage (contact sec),
+        // 0x10 / 0x20 Frisquet Connect (forum, non confirmé), 9 = anomalie (firmware d'origine).
+        uint8_t mode = 0;
     };
 
     // État d'un module hydraulique (0x25 = index 0, 0x26 = index 1).

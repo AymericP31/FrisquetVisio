@@ -7,8 +7,9 @@
 // Entités créées (mêmes identifiants que le firmware d'origine HAFrisquetVisio) :
 //   Zone_N        climate : Auto = thermostat physique, Heat = consigne imposée, Off = hors-gel
 //                 température affichée = ambiante renvoyée par la chaudière (comme l'original)
-//   ModeZoneN     texte   : mode radio du thermostat (Heure pleine, Hors gel...)
-//   Text          nombre  : température extérieure
+//   ModeZoneN     texte   : mode radio du thermostat (Auto jour, Hors gel...)
+//   PileZoneN     binaire : piles faibles du thermostat (message « CHANGER PILES »)
+//   Text          nombre  : température extérieure (non publiée si pas de sonde)
 //   ModeChaudiere texte   : mode chaudière
 //   TspEauN       nombre  : consigne d'eau du module hydraulique N
 //   TmesEauN      nombre  : départ d'eau mesuré par le module hydraulique N
@@ -38,7 +39,7 @@ class FrisquetVisioHA {
 public:
     // Nombre d'entités créées : à prévoir dans HAMqtt(client, device, N).
     static constexpr uint8_t entityCount(uint8_t zones, uint8_t hydraulicModules) {
-        return 3 + zones * 2 + hydraulicModules * 3;
+        return 3 + zones * 3 + hydraulicModules * 3;
     }
 
     explicit FrisquetVisioHA(FrisquetVisio& visio);
@@ -94,6 +95,7 @@ private:
 
     HAHVAC* climates_[FrisquetVisio::MaxZones] = {};
     HASensor* zoneModes_[FrisquetVisio::MaxZones] = {};
+    HABinarySensor* batteries_[FrisquetVisio::MaxZones] = {};
     HASensorNumber* outdoor_ = nullptr;
     HASensor* boilerMode_ = nullptr;
     HASensor* tramType_ = nullptr;

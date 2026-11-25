@@ -15,6 +15,8 @@ constexpr float MaxSetpoint = 24.0f;
 constexpr uint8_t BoilerAddress = 0x80;
 constexpr uint8_t FirstSatelliteAddress = 0x08;
 constexpr uint8_t FirstHydraulicAddress = 0x25;
+// T° extérieure 129,0 °C (0x050A) : la chaudière n'a pas de sonde extérieure.
+constexpr uint16_t NoOutdoorSensor = 0x050A;
 
 // Le Network ID FF FF FF FF sert uniquement à écouter l'association : émission interdite.
 bool isBroadcast(const uint8_t* id) {
@@ -160,17 +162,18 @@ bool FrisquetVisio::plausible(const uint8_t* frame, size_t length) const {
     case 23:  // Thermostat : ambiance, consigne, mode
         return in(15, 0, 40) && in(17, 5, 30)
             && (frame[20] <= 0x05 || frame[20] == 0x10 || frame[20] == 0x14);
-    case 49:  // Chaudière : T° ext (saturée à 35 °C), mode, ambiance + consigne des zones gérées
+    case 49:  // Chaudière : T° ext (saturée à 35 °C ou 129 °C = sans sonde), mode, zones gérées
         for (size_t z = 0; z < config_.zoneCount; ++z) {
             if (!in(19 + z * 10, 0, 40) || !in(21 + z * 10, 5, 30)) return false;
         }
-        return in(7, -20, 35) && frame[17] <= 9;
+        return (((frame[7] << 8) | frame[8]) == NoOutdoorSensor || in(7, -20, 35))
+            && frame[17] < 0x40;
     case 19:  // Chaudière -> module : T° eau consigne, mode (9 = chaudière arrêtée)
         return in(15, 0, 70) && (frame[18] <= 3 || frame[18] == 9 || frame[18] == 42);
     case 9:   // Module -> chaudière : T° eau départ
         return in(7, 0, 70);
-    case 15:  // Chaudière -> module : mode chaudière
-        return frame[13] <= 9;
+    case 15:  // Chaudière -> module : mode chaudière (champ de bits)
+        return frame[13] < 0x40;
     default:  // Aucun octet exploité
         return true;
     }
@@ -190,7 +193,16 @@ int8_t FrisquetVisio::frameZone(const uint8_t* frame, size_t length) const {
 
 void FrisquetVisio::decode(const uint8_t* frame, size_t length, uint32_t now, bool crcMismatch,
                            float rssi) {
-    // Octet 5 = 0x17 pour toutes les trames Visio exploitées.
+    // Thermostat -> chaudière, octet 5 = 0x43 : message affiché, octets 6-7 = longueur du
+    // texte qui suit. Seul texte observé : « SATELLITE Zn » « CHANGER PILES ». Longueur 0 =
+    // message effacé (piles changées, redémarrage du thermostat).
+    if (length >= 8 && frame[0] == BoilerAddress && frame[4] == 0x01 && frame[5] == 0x43
+        && static_cast<size_t>((frame[6] << 8) | frame[7]) == length - 8) {
+        const uint8_t zone = static_cast<uint8_t>(frame[1] - FirstSatelliteAddress);
+        if (zone < config_.zoneCount) zones_[zone].batteryLow = length > 8;
+        return;
+    }
+    // Octet 5 = 0x17 pour toutes les autres trames Visio exploitées.
     if (length < 6 || frame[5] != 0x17) return;
     const int8_t index = frameZone(frame, length);
 
@@ -223,7 +235,8 @@ void FrisquetVisio::decode(const uint8_t* frame, size_t length, uint32_t now, bo
     if (index >= 0 && length == 49) {
         boiler_.dataValid = true;
         boiler_.modeValid = true;
-        boiler_.outdoorTemperature = temperature(frame + 7);
+        boiler_.outdoorTemperature = ((frame[7] << 8) | frame[8]) == NoOutdoorSensor
+            ? NAN : temperature(frame + 7);
         boiler_.mode = frame[17];
         for (uint8_t i = 0; i < config_.zoneCount; ++i) {
             zones_[i].boilerValid = true;
@@ -318,8 +331,8 @@ int16_t FrisquetVisio::transmit(uint8_t index) {
     frame[17] = static_cast<uint8_t>(encoded >> 8);
     frame[18] = static_cast<uint8_t>(encoded);
 
-    // Octet 20 : mode. On garde la famille du thermostat (auto 0x00/0x01 ou fixe 0x04/0x05)
-    // et on force Heure pleine (0x01/0x05) ou Hors gel (0x10/0x14).
+    // Octet 20 : mode. On garde la famille du thermostat (permanent 0x00/0x01 ou auto
+    // 0x04/0x05, dérogation 0x02/0x03 -> auto) et on force Jour (0x01/0x05) ou Hors gel (0x10/0x14).
     const bool fixedMode = frame[20] == 0x00 || frame[20] == 0x01;
     frame[20] = zone.mode == Mode::Heat ? (fixedMode ? 0x01 : 0x05)
                                         : (fixedMode ? 0x10 : 0x14);

@@ -61,7 +61,7 @@ Dans l'exemple 02, une reconnexion Wi-Fi/MQTT peut bloquer la boucle quelques se
 
 ## Home Assistant : `FrisquetVisioHA`
 
-Mêmes entités que le firmware d'origine : `Zone_N` (climate Auto/Heat/Off), `ModeZoneN`, `Text`, `ModeChaudiere`, `TspEauN`, `TmesEauN`, `ModeHydN`, `TramType`. Les consignes Heat et Off sont sauvegardées en NVS (`frisquet` / `modesp`).
+Mêmes entités que le firmware d'origine : `Zone_N` (climate Auto/Heat/Off), `ModeZoneN`, `Text`, `ModeChaudiere`, `TspEauN`, `TmesEauN`, `ModeHydN`, `TramType`, plus `PileZoneN` (piles faibles du thermostat). Les consignes Heat et Off sont sauvegardées en NVS (`frisquet` / `modesp`).
 
 Températures du climate `Zone_N`, comme l'original : **température courante** = ambiante renvoyée par la chaudière (réponse 49 octets, octets 19–20 + 10×zone) ; **consigne** = celle du thermostat physique (trame thermostat, octets 17–18) en Auto, celle de HA en Heat/Off. La bibliothèque radio expose aussi l'ambiante envoyée par le thermostat (`Zone::ambientTemperature`).
 

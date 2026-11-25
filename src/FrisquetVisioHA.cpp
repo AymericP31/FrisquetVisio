@@ -20,6 +20,8 @@ const char* const ClimateIds[] = {"Zone_1", "Zone_2", "Zone_3"};
 const char* const ClimateNames[] = {"Zone 1", "Zone 2", "Zone 3"};
 const char* const ZoneModeIds[] = {"ModeZone1", "ModeZone2", "ModeZone3"};
 const char* const ZoneModeNames[] = {"Mode zone 1", "Mode zone 2", "Mode zone 3"};
+const char* const BatteryIds[] = {"PileZone1", "PileZone2", "PileZone3"};
+const char* const BatteryNames[] = {"Pile zone 1", "Pile zone 2", "Pile zone 3"};
 const char* const WaterSetpointIds[] = {"TspEau1", "TspEau2"};
 const char* const WaterSetpointNames[] = {"Consigne eau module 1", "Consigne eau module 2"};
 const char* const WaterTemperatureIds[] = {"TmesEau1", "TmesEau2"};
@@ -27,14 +29,18 @@ const char* const WaterTemperatureNames[] = {"T°eau depart module 1", "T°eau d
 const char* const HydraulicModeIds[] = {"ModeHyd1", "ModeHyd2"};
 const char* const HydraulicModeNames[] = {"Mode module hydraulique 1", "Mode module hydraulique 2"};
 
-// Conversion des codes radio en texte (mêmes libellés que HAFrisquetVisio).
+// Conversion des codes radio en texte (libellés 0/8/9 de HAFrisquetVisio).
+// Mode chaudière = champ de bits ; bits 0x10/0x20 = Frisquet Connect (forum, non confirmé).
 const char* boilerModeText(uint8_t mode, char* buffer) {
-    switch (mode) {
-    case 0: return "Heating Off";
-    case 8: return "Heating On";
-    case 9: return "Anomalie";
-    default: std::snprintf(buffer, 24, "%u", mode); return buffer;
+    const char* const connect = (mode & 0x30) ? " + Connect" : "";
+    switch (mode & ~0x30) {
+    case 0: std::snprintf(buffer, 24, "Heating Off%s", connect); break;
+    case 4: std::snprintf(buffer, 24, "Contact sec%s", connect); break;
+    case 8: std::snprintf(buffer, 24, "Heating On%s", connect); break;
+    case 9: std::snprintf(buffer, 24, "Anomalie%s", connect); break;
+    default: std::snprintf(buffer, 24, "%u", mode); break;
     }
+    return buffer;
 }
 
 const char* hydraulicModeText(uint8_t mode, char* buffer) {
@@ -49,16 +55,18 @@ const char* hydraulicModeText(uint8_t mode, char* buffer) {
     }
 }
 
+// Octet 20 du thermostat (forum HACF + relevés) : 0x00/0x01 permanent, 0x04/0x05 auto,
+// 0x02/0x03 dérogation, 0x10 hors gel (bit 0 = jour/confort).
 const char* zoneModeText(uint8_t mode, char* buffer) {
     switch (mode) {
-    case 0x00: return "Auto Heure creuse";
-    case 0x01: return "Auto Heure pleine";
+    case 0x00: return "Nuit";
+    case 0x01: return "Jour";
     case 0x02: return "Dérogation nuit";
     case 0x03: return "Dérogation jour";
-    case 0x04: return "Heure creuse";
-    case 0x05: return "Heure pleine";
+    case 0x04: return "Auto nuit";
+    case 0x05: return "Auto jour";
     case 0x10: return "Hors gel";
-    case 0x14: return "Auto Hors gel";
+    case 0x14: return "Auto hors gel";
     default: std::snprintf(buffer, 24, "Inconnu (0x%02X)", mode); return buffer;
     }
 }
@@ -99,6 +107,10 @@ int frameLabel(const uint8_t* f, uint8_t n, char* out, size_t size) {
     const bool fromBoiler = n > 1 && f[1] == 0x80;
     const bool toBoiler = n > 1 && f[0] == 0x80;
     const auto module = [](uint8_t address) { return address == 0x25 || address == 0x26; };
+    if (n >= 6 && f[5] == 0x43) {
+        return std::snprintf(out, size, toBoiler ? "43: Message Zone %u" : "43: Réponse message Zone %u",
+                             (toBoiler ? f[1] : f[0]) - 0x07);
+    }
     if (n == 23 && toBoiler && f[1] >= 0x08 && f[1] <= 0x0A) {
         return std::snprintf(out, size, "%u: Zone %u", f[1], f[1] - 0x07);
     }
@@ -183,6 +195,9 @@ bool FrisquetVisioHA::begin(uint8_t zoneCount, uint8_t hydraulicModuleCount,
         climate->onTargetTemperatureCommand(onTargetTemperatureCommand);
         climates_[i] = climate;
         zoneModes_[i] = textSensor(ZoneModeIds[i], ZoneModeNames[i]);
+        batteries_[i] = new HABinarySensor(BatteryIds[i]);
+        batteries_[i]->setName(BatteryNames[i]);
+        batteries_[i]->setDeviceClass("battery");  // on = piles faibles
     }
     outdoor_ = temperatureSensor("Text", "T°Air exterieur", "mdi:home-thermometer-outline");
     boilerMode_ = textSensor("ModeChaudiere", "Mode Chaudiere");
@@ -372,9 +387,12 @@ void FrisquetVisioHA::publish() {
         if (zone.satelliteValid) {
             publishText(zoneModes_[i], lastZoneMode_[i], zone.satelliteRadioMode, zoneModeText);
         }
+        batteries_[i]->setState(zone.batteryLow);
     }
 
-    if (boiler_.dataValid) outdoor_->setValue(boiler_.outdoorTemperature);
+    if (boiler_.dataValid && std::isfinite(boiler_.outdoorTemperature)) {
+        outdoor_->setValue(boiler_.outdoorTemperature);
+    }
     if (boiler_.modeValid) publishText(boilerMode_, lastBoilerMode_, boiler_.mode, boilerModeText);
 
     for (uint8_t i = 0; i < hydraulicCount_; ++i) {
