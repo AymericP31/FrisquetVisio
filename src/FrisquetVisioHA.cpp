@@ -224,7 +224,13 @@ void FrisquetVisioHA::onRadioEvent(const FrisquetVisio::Event& event, void* self
     // Confirmation : l'événement Receive qui suit affiche déjà « 81: Réponse Chaudière ».
     if (event.type == FrisquetVisio::EventType::TxConfirmed) return;
     RadioRecord record;
-    record.at = millis();
+    record.elapsedMs = 0;
+    if (event.type == FrisquetVisio::EventType::Receive
+        || event.type == FrisquetVisio::EventType::Transmit) {
+        const uint32_t now = millis();
+        record.elapsedMs = ha->traceTime_.elapsedMs(now);
+        ha->traceTime_.record(now);
+    }
     record.status = event.status;
     record.type = event.type;
     record.zone = event.zone;
@@ -254,8 +260,6 @@ void FrisquetVisioHA::publishTramType() {
             } else {
                 n = std::snprintf(text, sizeof(text), "No tram received (%d)", r.status);
             }
-            n += std::snprintf(text + n, sizeof(text) - n, " - Time: %lus RSSI %.0f",
-                               static_cast<unsigned long>(r.at / 1000), r.rssi);
         } else if (r.type == FrisquetVisio::EventType::Transmit) {
             // Octets 17-18 de la trame émise = consigne en dixièmes de degré.
             const float target = ((r.data[17] << 8) | r.data[18]) / 10.0f;
@@ -270,6 +274,14 @@ void FrisquetVisioHA::publishTramType() {
         } else {
             n = std::snprintf(text, sizeof(text), "Zone %d : pas de réponse chaudière au thermostat",
                               r.zone + 1);
+        }
+        if (r.type == FrisquetVisio::EventType::Receive
+            || r.type == FrisquetVisio::EventType::Transmit) {
+            n += std::snprintf(text + n, sizeof(text) - n, " - Time: ");
+            n += FrisquetVisioTraceTime::format(text + n, sizeof(text) - n, r.elapsedMs);
+            if (r.type == FrisquetVisio::EventType::Receive) {
+                n += std::snprintf(text + n, sizeof(text) - n, " RSSI %.0f", r.rssi);
+            }
         }
         // Option debug : octets en hexadécimal (49 x 3 caractères max, tient dans 256).
         for (uint8_t i = 0; tramBytes_ && i < r.length && n < static_cast<int>(sizeof(text)) - 4; ++i) {

@@ -67,6 +67,12 @@ Températures du climate `Zone_N`, comme l'original : **température courante** 
 
 `TramType` affiche chaque trame reçue ou émise pour vérifier la radio : `8: Zone 1`, `81: Réponse Chaudière Reçue Zone 1`, `251`/`253`/`255`/`257` module hydraulique, suffixe `(CRC non valide)`, `Envoie consigne Zone 1 : 20.0°C TrNum BC`, absence de réponse chaudière. `begin(..., tramBytes = true)` ajoute les octets en hexadécimal (équivalent de `ConfTram`).
 
+Dans `TramType` et les traces Telnet, `Time` mesure le délai depuis la précédente
+réception ou émission, tous appareils confondus : `12ms`, `2000ms`, puis `2.1s`
+au-dessus de 2 secondes (arrondi à 100 ms, une décimale). La première trame affiche
+`0ms`. Les confirmations et timeouts ne réinitialisent pas ce délai ; il est
+calculé dans la tâche radio, pas à la publication MQTT.
+
 ```cpp
 HAMqtt mqtt(wifiClient, device, FrisquetVisioHA::entityCount(ZONES, MODULES));
 FrisquetVisioHA visioHA(visio);
@@ -191,6 +197,8 @@ Les tests C++ simulent la radio, les réponses, les délais, les zones, le compt
 ```text
 g++ -std=c++11 -Wall -Wextra -Werror -Itest/stubs -Isrc test/radio_test.cpp src/FrisquetVisio.cpp -o radio_test
 ./radio_test
+g++ -std=c++11 -Wall -Wextra -Werror -Isrc test/trace_time_test.cpp -o trace_time_test
+./trace_time_test
 ```
 
 Ils ne remplacent pas des essais sur chaudière, en particulier pour le temps de réponse et les collisions radio.

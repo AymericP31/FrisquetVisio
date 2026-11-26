@@ -9,6 +9,7 @@
 
 #include <Arduino.h>
 #include "FrisquetVisio.h"
+#include "FrisquetVisioTraceTime.h"
 
 class FrisquetVisioStats {
 public:
@@ -41,11 +42,13 @@ public:
     Rx other = {};                               // trames non attribuées
     Tx tx[FrisquetVisio::MaxZones] = {};
     uint32_t crcErrors = 0;                      // RADIOLIB_ERR_CRC_MISMATCH, toutes trames
+    FrisquetVisioTraceTime traceTime;
 
     void record(const FrisquetVisio::Event& event, uint32_t now);
     void reset() { *this = FrisquetVisioStats(); }
     // Âge de la dernière trame chaudière ; depuis le démarrage si aucune trame reçue.
     uint32_t boilerRxAgeMs(uint32_t now) const { return now - boiler.lastAt; }
+    // Appeler avant record() : Time = délai depuis la précédente RX/TX (0 pour la première).
     // Une ligne de trace pour un événement (octets en hexadécimal). Renvoie la longueur écrite.
     size_t formatTrace(const FrisquetVisio::Event& event, uint32_t now, char* out, size_t size) const;
     // Rapport Telnet. device : all, zone1..zone3 (z1..z3), chaudiere, hydrau, heltec, init, help.

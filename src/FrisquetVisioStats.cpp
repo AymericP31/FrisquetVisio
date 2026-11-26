@@ -36,6 +36,7 @@ const char* yesNo(bool value) { return value ? "oui" : "non"; }
 }  // namespace
 
 void FrisquetVisioStats::record(const FrisquetVisio::Event& e, uint32_t now) {
+    if (e.type == Type::Receive || e.type == Type::Transmit) traceTime.record(now);
     if (e.type == Type::Receive) {
         if (e.status == RADIOLIB_ERR_CRC_MISMATCH) ++crcErrors;
         Rx& rx = (e.length == 23 && e.zone >= 0) ? satellite[e.zone]
@@ -78,16 +79,18 @@ size_t FrisquetVisioStats::formatTrace(const FrisquetVisio::Event& e, uint32_t n
     if (out == nullptr || size == 0) return 0;
     if (e.type != Type::Receive && (e.zone < 0 || e.zone >= FrisquetVisio::MaxZones)) return 0;
     const unsigned zone = static_cast<unsigned>(e.zone + 1);
+    char elapsed[20];
+    FrisquetVisioTraceTime::format(elapsed, sizeof(elapsed), traceTime.elapsedMs(now));
     int n = 0;
     switch (e.type) {
     case Type::Receive:
-        n = std::snprintf(out, size, "RX st=%d len=%u rssi=%.1f Time: %lums: ", e.status,
-                          static_cast<unsigned>(e.length), e.rssi, static_cast<unsigned long>(now));
+        n = std::snprintf(out, size, "RX st=%d len=%u rssi=%.1f Time: %s: ", e.status,
+                          static_cast<unsigned>(e.length), e.rssi, elapsed);
         break;
     case Type::Transmit:
-        n = std::snprintf(out, size, "%sDelay %lums: \nSent Zone %u: ",
+        n = std::snprintf(out, size, "%sDelay %lums: \nSent Zone %u - Time: %s: ",
                           e.status == RADIOLIB_ERR_NONE ? "" : "TX ERREUR ",
-                          static_cast<unsigned long>(now - satellite[e.zone].lastAt), zone);
+                          static_cast<unsigned long>(now - satellite[e.zone].lastAt), zone, elapsed);
         break;
     case Type::TxConfirmed:
         n = std::snprintf(out, size, "Zone %u: confirmation chaudiere %lu ms, RSSI %.1f dBm",

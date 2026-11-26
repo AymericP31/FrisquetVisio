@@ -34,6 +34,7 @@
 #include <freertos/semphr.h>
 
 #include "FrisquetVisio.h"
+#include "FrisquetVisioTraceTime.h"
 
 class FrisquetVisioHA {
 public:
@@ -68,7 +69,7 @@ private:
 
     // Copie d'un événement radio pour TramType (49 octets = plus longue trame Visio).
     struct RadioRecord {
-        uint32_t at;
+        uint32_t elapsedMs;
         int16_t status;
         FrisquetVisio::EventType type;
         int8_t zone;
@@ -89,6 +90,7 @@ private:
     FrisquetVisio& visio_;
     SemaphoreHandle_t mutex_ = nullptr;
     QueueHandle_t radioRecords_ = nullptr;
+    FrisquetVisioTraceTime traceTime_;
     bool tramBytes_ = false;
     uint8_t zoneCount_ = 0;
     uint8_t hydraulicCount_ = 0;
